@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:price_chart_app/screens/price_chart_screen.dart';
+// ignore: unused_import
 import 'screens/login_screen.dart';
 
 void main() async {
@@ -21,7 +23,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF756B49),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      home: PriceChartScreen(),
     );
   }
 }
