@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'settings_screen.dart'; // Ensure this file exists in your screens folder
+import 'package:intl/intl.dart';
+import '../models/price_point.dart';
+import '../services/api_service.dart';
+import 'settings_screen.dart';
 
 class PriceChartScreen extends StatefulWidget {
   @override
@@ -14,20 +17,45 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
   final List<String> tabs = ['Prices', 'Prediction', 'All'];
   final List<String> timeOptions = ['1H', '24H', '7D', '1M', '3M', '6M'];
 
-  final List<Map<String, String>> priceData = [
-    {'time': 'Apr 01 10:00', 'price': '\$44,000'},
-    {'time': 'Apr 01 11:00', 'price': '\$65,000'},
-    {'time': 'Apr 01 12:00', 'price': '\$50,000'},
-  ];
+  List<PricePoint> priceData = [];
+  List<PricePoint> predictionData = [];
+  bool isLoading = true;
 
-  final List<Map<String, String>> predictionData = [
-    {'time': 'Apr 01 13:00', 'price': '\$44,000'},
-    {'time': 'Apr 01 14:00', 'price': '\$84,000'},
-    {'time': 'Apr 01 15:00', 'price': '\$44,000'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    try {
+      final live = await ApiService.fetchLiveData();
+      final preds = await ApiService.fetchPredictions();
+      setState(() {
+        priceData = live;
+        predictionData = preds;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading data: $e');
+    }
+  }
+
+  List<FlSpot> generateSpots(List<PricePoint> data) {
+    return List.generate(data.length, (index) {
+      return FlSpot(index.toDouble(), data[index].price);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF665D45),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF665D45),
       appBar: AppBar(
@@ -52,7 +80,6 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Title
             const Text(
               'Price Chart',
               style: TextStyle(
@@ -135,28 +162,14 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
                 LineChartData(
                   lineBarsData: [
                     LineChartBarData(
-                      spots: [
-                        FlSpot(0, 40),
-                        FlSpot(1, 65),
-                        FlSpot(2, 50),
-                        FlSpot(3, 70),
-                        FlSpot(4, 30),
-                        FlSpot(5, 90),
-                      ],
+                      spots: generateSpots(priceData),
                       isCurved: true,
                       color: Colors.blue,
                       barWidth: 3,
                       dotData: FlDotData(show: false),
                     ),
                     LineChartBarData(
-                      spots: [
-                        FlSpot(0, 44),
-                        FlSpot(1, 84),
-                        FlSpot(2, 44),
-                        FlSpot(3, 60),
-                        FlSpot(4, 80),
-                        FlSpot(5, 40),
-                      ],
+                      spots: generateSpots(predictionData),
                       isCurved: true,
                       color: Colors.orange,
                       barWidth: 3,
@@ -191,8 +204,8 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
+                children: [
+                  const Text(
                     "Market Summary",
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
@@ -200,25 +213,31 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         "Current Price:",
                         style: TextStyle(color: Colors.white),
                       ),
-                      Text("\$70,000", style: TextStyle(color: Colors.white)),
+                      Text(
+                        '\$${priceData.last.price.toStringAsFixed(2)}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ],
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         "Next Prediction:",
                         style: TextStyle(color: Colors.white),
                       ),
-                      Text("\$44,000", style: TextStyle(color: Colors.white)),
+                      Text(
+                        '\$${predictionData.last.price.toStringAsFixed(2)}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ],
                   ),
                 ],
@@ -230,7 +249,7 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
     );
   }
 
-  Widget _buildDataColumn(String title, List<Map<String, String>> data) {
+  Widget _buildDataColumn(String title, List<PricePoint> data) {
     return SizedBox(
       width: 150,
       child: Column(
@@ -250,9 +269,11 @@ class _PriceChartScreenState extends State<PriceChartScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
-              children: data
-                  .map((item) => _buildTableRow(item['time']!, item['price']!))
-                  .toList(),
+              children: data.map((point) {
+                final time = DateFormat('MMM dd HH:mm').format(point.date);
+                final price = '\$${point.price.toStringAsFixed(2)}';
+                return _buildTableRow(time, price);
+              }).toList(),
             ),
           ),
         ],
